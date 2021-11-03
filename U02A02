@@ -1,0 +1,46 @@
+#include "nnxt.h"
+#include <stdio.h>
+
+
+int main(){
+     sensor_touch_clicked_t touch_new, touch_old = SensorTouch_released;
+    SensorConfig(Port_3, SensorTouch);
+
+    uint32_t startZeit = 0;
+    uint32_t zeit;
+    int counter = 0;
+    double frequenz;
+
+    char msg1[5];
+    char msg2[8];
+
+    while(1) {
+        Touch_Clicked(Port_3, &touch_new);
+        if (touch_new == SensorTouch_clicked && touch_old == SensorTouch_released) {
+            counter++;
+
+            if (startZeit == 0)
+                startZeit = GetSysTime();
+
+            sprintf(msg1, "%d", counter);
+            sprintf(msg2, "%d", zeit);
+            NNXT_LCD_DisplayStringAtLine(0, msg1);
+            NNXT_LCD_DisplayStringAtLine(1, msg2);
+        }
+
+        if(startZeit != 0)
+            zeit = GetSysTime() - startZeit;
+        if(zeit >= 5000) break;
+
+        touch_old = touch_new;
+        Delay(25);
+    }
+
+    frequenz = (counter*1000.0)/zeit;
+    sprintDouble(msg1, frequenz, 1);
+    NNXT_LCD_DisplayStringAtLine(4, msg1);
+
+    while(1);
+
+   	return 0;
+}
