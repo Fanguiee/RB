@@ -1,0 +1,121 @@
+#include "nnxt.h"
+#include <stdbool.h>
+#define N 100
+#define EV_FAHREN 0
+#define EV_RICHTUNG 1
+#define EV_MOTOR_STOP 2
+#define TIMER_1SEC 0
+
+typedef uint16_t EventType;
+struct TimerType
+
+void setEvent(EventType);
+bool eventIsSet(EventType);
+void clearEvent(EventType);
+
+void setTimer(TimerType, int, EventType);
+void startTimer(TimerType);
+void cancelTimer(TimerType);
+
+volatile uint16_t events = 0;
+volatile uint16_t timer = 0;
+
+void task1() {
+    sensor_touch_clicked_t touch_l = SensorTouch_released;
+
+    while(1) {
+        Touch_Clicked(Port_3, &touch_l);
+        if(touch_l == SensorTouch_clicked)
+            setEvent(EV_FAHREN);
+
+        Delay(N);
+    }
+}
+void task2() {
+    sensor_touch_clicked_t touch_r_old, touch_r_new = SensorTouch_released;
+
+    while(1) {
+        Touch_Clicked(Port_0, &touch_r_new);
+        if(touch_r_new == SensorTouch_clicked && touch_r_old == SensorTouch_released){
+            setEvent(EV_RICHTUNG);
+        }
+
+        touch_r_old = touch_r_new;
+        Delay(N);
+    }
+}
+void task3() {
+    motor_dir_t motorDir = Motor_dir_forward;
+    setTimer(TIMER_1SEC, 1000, EV_MOTOR_STOP);
+
+    while(1) {
+        if( eventIsSet(EV_RICHTUNG) ) {
+            if(motorDir == Motor_dir_forward)
+                motorDir = Motor_dir_backward;
+            else
+                motorDir = Motor_dir_forward;
+            clearEvent(EV_RICHTUNG);
+        }
+        if( eventIsSet(EV_FAHREN) ) {
+            Motor_Drive(Port_A, motorDir, 35);
+            Motor_Drive(Port_B, motorDir, 35);
+            startTimer(timer1);
+        }
+        if( eventIsSet(EV_MOTOR_STOP) ) {
+            Motor_Stop(Port_A, Motor_stop_float);
+            Motor_Stop(Port_B, Motor_stop_float);
+            clearEvent(EV_MOTOR_STOP);
+        }
+        Delay(N);
+    }
+}
+
+int main(){
+    SensorConfig(Port_0, SensorTouch);
+    SensorConfig(Port_3, SensorTouch);
+    MotorPortInit(Port_A);
+    MotorPortInit(Port_B);
+
+    CreateTask(task1);
+    CreateTask(task2);
+    CreateTask(task3);
+    StartTask(task1);
+    StartTask(task2);
+    StartTask(task3);
+    StartScheduler();
+
+   	return 0;
+}
+
+void setEvent(EventType ev) {
+    taskENTER_CRITICAL();
+    events |= (1 << ev);
+    taskEXIT_CRITICAL();
+}
+
+bool eventIsSet(EventType ev){
+    taskENTER_CRITICAL();
+     if((events & (1 << ev)) != 0) {
+         taskEXIT_CRITICAL();
+         return true;
+     } else {
+         taskEXIT_CRITICAL();
+         return false;
+     }
+};
+
+void clearEvent(EventType ev) {
+    taskENTER_CRITICAL();
+    events &= ~(1 << ev);
+    taskEXIT_CRITICAL();
+}
+
+void setTimer(TimerType timer, int time, EventType ev) {
+
+}
+void startTimer(TimerType timer) {
+
+}
+void cancelTimer(TimerType timer) {
+
+}
