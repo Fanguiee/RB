@@ -1,0 +1,72 @@
+#include "nnxt.h"
+#define N 100
+
+volatile uint8_t richtung_aendern = 0;
+volatile uint8_t fahren = 0;
+
+void task1() {
+    sensor_touch_clicked_t touch_l = SensorTouch_released;
+
+    while(1) {
+        Touch_Clicked(Port_3, &touch_l);
+        if(touch_l == SensorTouch_clicked)
+            fahren = 1;
+
+        Delay(N);
+    }
+}
+
+void task2() {
+    sensor_touch_clicked_t touch_r_old, touch_r_new = SensorTouch_released;
+
+    while(1) {
+        Touch_Clicked(Port_0, &touch_r_new);
+        if(touch_r_new == SensorTouch_clicked && touch_r_old == SensorTouch_released){
+            richtung_aendern = 1;
+        }
+
+        touch_r_old = touch_r_new;
+        Delay(N);
+    }
+}
+
+void task3() {
+    motor_dir_t motorDir = Motor_dir_forward;
+
+    while(1) {
+        if(richtung_aendern == 1) {
+            if(motorDir == Motor_dir_forward)
+                motorDir = Motor_dir_backward;
+            else
+                motorDir = Motor_dir_forward;
+            richtung_aendern = 0;
+        }
+        if(fahren == 1) {
+            Motor_Drive(Port_A, motorDir, 35);
+            Motor_Drive(Port_B, motorDir, 35);
+            Delay(1000);
+            Motor_Stop(Port_A, Motor_stop_float);
+            Motor_Stop(Port_B, Motor_stop_float);
+            fahren = 0;
+        }
+
+        Delay(N);
+    }
+}
+
+int main(){
+    SensorConfig(Port_0, SensorTouch);
+    SensorConfig(Port_3, SensorTouch);
+    MotorPortInit(Port_A);
+    MotorPortInit(Port_B);
+
+    CreateTask(task1);
+    CreateTask(task2);
+    CreateTask(task3);
+    StartTask(task1);
+    StartTask(task2);
+    StartTask(task3);
+    StartScheduler();
+
+   	return 0;
+}
