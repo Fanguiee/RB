@@ -1,0 +1,55 @@
+#include "nnxt.h"
+#include "nnxt_pcf8574lb.h"
+#include "events.h"
+#define N 200
+#define EV_LED_AN 0
+#define EV_LED_AUS 1
+#define EV_FREQ_UP 3
+#define EV_FREQ_DOWN 4
+
+uint8_t n = 1000;
+
+void task1() {
+    sensor_touch_clicked_t touch_l_old, touch_l_new = SensorTouch_released;
+
+    while(1) {
+        Touch_Clicked(Port_0, &touch_r_new);
+        if(touch_r_new == SensorTouch_clicked && touch_r_old == SensorTouch_released)
+            setEvent(EV_FREQ_DOWN);
+        else
+            clearEvent(EV_FREQ_DOWN);
+        touch_r_old = touch_r_new;
+
+        Delay(N);
+    }
+}
+void task2() {
+    sensor_touch_clicked_t touch_r_old, touch_r_new = SensorTouch_released;
+
+    while(1) {
+        Touch_Clicked(Port_3, &touch_l_new);
+        if(touch_l_new == SensorTouch_clicked && touch_l_old == SensorTouch_released)
+            setEvent(EV_FREQ_UP);
+        else
+            clearEvent(EV_FREQ_UP);
+        touch_l_old = touch_l_new;
+
+        Delay(N);
+    }
+}
+void task3() {
+    setTimer(&timer, n, EV_LED_AN);
+}
+
+int main(){
+    SensorPortInit(Port_1);
+
+    while(1) {
+        DeletePort(Port_1, 0);
+        Delay(n);
+        WritePort(Port_1, 0);
+        Delay(n);
+    }
+   	return 0;
+}
+
