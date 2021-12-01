@@ -1,0 +1,44 @@
+#include "nnxt.h"
+#define DEG_TO_RPM 166.6667                 // Umrechnungsfaktor [°/ms] in [U/min]
+#define  U_MIN_TO_CM_S 0.225
+int main(){
+    char pow[4], speed[5];                        // enthält Umdrehung/min als String für Ausgabe auf Display
+    uint32_t prev_deg, deg;                 // deg enthält Differenz vom Zähler jetzt und bei der letzten Messung vor 500ms (prev_deg)
+    uint32_t dt, prev_tick = GetSysTime();  // dt enthält Differenz der Zeiten jetzt und der Zeit der letzten Messung (prev_tick)
+    double cm_s, diff_old = 9.0, diff, summe = 0.0;                             // enthält Wert der Umdrehungen pro Minute
+    uint8_t motor_power = 0;
+
+    MotorPortInit(Port_A);
+    MotorPortInit(Port_B);
+    Motor_Tacho_GetCounter(Port_A, &prev_deg);
+    Motor_Drive(Port_A, Motor_dir_forward, motor_power);
+    Motor_Drive(Port_B, Motor_dir_forward, motor_power);
+    while(1) {
+        Delay(200);                                    // Abtastintervall 500ms
+        dt = GetSysTime() - prev_tick;                 // Zeitdifferenz seit letzter Messung ermitteln
+        Motor_Tacho_GetCounter(Port_A, &deg);
+        deg = deg - prev_deg;                          // um wieviel ist der Umdrehungszähler seit letzter Messung gewachsen
+        cm_s = U_MIN_TO_CM_S*((deg*1.33) * DEG_TO_RPM) / (double)dt;  // deg*1.33 weil Auflösung Drehzahlsensor 1 Digit entspr. 1,33 Grad
+        diff = 9.0 - cm_s;
+        summe += diff;
+
+        motor_power += 1.0 * diff; // P-Regler
+        //motor_power += 1.0 * diff + 0.1 * dt/1000.0 * summe; // PI-Regler
+        //motor_power += 1.0 * diff + 0.5 * (diff - diff_old) * 1000.0/dt;// PD-Regler
+        diff_old = diff;
+
+        if(motor_power < 0) motor_power = 0;
+        if(motor_power > 80) motor_power = 80;
+        Motor_Drive(Port_A, Motor_dir_forward, motor_power);
+        Motor_Drive(Port_B, Motor_dir_forward, motor_power);
+
+        Motor_Tacho_GetCounter(Port_A, &prev_deg);     // Zählerstand für nächste Messung vorbereiten
+        prev_tick = GetSysTime();                      // Zeitmessung für nächste Messung vorbereiten
+
+        sprintf(pow, "%3d", motor_power);
+        sprintDouble(speed, cm_s, 1);
+        NNXT_LCD_DisplayStringAtLine(0, pow);
+        NNXT_LCD_DisplayStringAtLine(1, speed);
+    }
+    return 0;
+}
