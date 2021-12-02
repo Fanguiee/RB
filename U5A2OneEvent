@@ -1,0 +1,74 @@
+#include "nnxt.h"
+#include "nnxt_pcf8574lb.h"
+#include "events.h"
+#define N 200
+#define EV_LED_AN 0
+
+typedef struct {
+    uint32_t startTime;
+    uint32_t time;
+    EventType event;
+    bool active;
+} TimerType;
+volatile TimerType timer;
+volatile uint8_t n = 1000;
+volatile freqUP = 0;
+volatile freqDown = 0;
+
+
+void task1() {
+    sensor_touch_clicked_t touch_r_old, touch_r_new = SensorTouch_released;
+
+    while(1) {
+        Touch_Clicked(Port_0, &touch_r_new);
+        if(touch_r_new == SensorTouch_clicked && touch_r_old == SensorTouch_released)
+            freqUP = 1;
+        touch_r_old = touch_r_new;
+
+        Delay(N);
+    }
+} 
+void task2() {
+    sensor_touch_clicked_t touch_l_old, touch_l_new = SensorTouch_released;
+
+    while(1) {
+        Touch_Clicked(Port_3, &touch_l_new);
+        if(touch_l_new == SensorTouch_clicked && touch_l_old == SensorTouch_released)
+            freqUP = 1;
+        touch_l_old = touch_l_new;
+
+        Delay(N);
+    }
+}
+void task3() {
+	while(1) {
+		if(freqUP)
+			n /= 2;
+		if(freqDown)
+			n *= 2;
+		setTimer(&timer, n, EV_LED_AN);
+		startTimer(&timer);
+	}
+}
+void task4() {
+	while(1) {
+		if(eventIsSet(EV_LED_AN))
+			DeletePort(Port_1, 0);
+		else
+			WritePort(Port_1, 0);
+	}
+}
+int main(){
+    SensorPortInit(Port_1);
+
+    CreatTask(task1);
+    StartTask(task1);
+    CreatTask(task2);
+    StartTask(task2);
+    CreatTask(task3);
+    StartTask(task3);
+    Startscheduler();
+    
+   	return 0;
+}
+
