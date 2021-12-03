@@ -1,55 +1,99 @@
 #include "nnxt.h"
 #include "nnxt_pcf8574lb.h"
 #include "events.h"
-#define N 200
+#define N 100
 #define EV_LED_AN 0
 #define EV_LED_AUS 1
-#define EV_FREQ_UP 3
-#define EV_FREQ_DOWN 4
+#define EV_FREQ_UP 2
+#define EV_FREQ_DOWN 3
 
-uint8_t n = 1000;
+volatile uint16_t led_time = 1000;
+char msg[10];
 
 void task1() {
-    sensor_touch_clicked_t touch_l_old, touch_l_new = SensorTouch_released;
+    sensor_touch_clicked_t touch_r_old, touch_r_new = SensorTouch_released;
 
     while(1) {
         Touch_Clicked(Port_0, &touch_r_new);
-        if(touch_r_new == SensorTouch_clicked && touch_r_old == SensorTouch_released)
-            setEvent(EV_FREQ_DOWN);
-        else
-            clearEvent(EV_FREQ_DOWN);
+        if(touch_r_new == SensorTouch_clicked && touch_r_old == SensorTouch_released) {
+            setEvent(EV_FREQ_UP);
+        }
         touch_r_old = touch_r_new;
 
         Delay(N);
     }
 }
 void task2() {
-    sensor_touch_clicked_t touch_r_old, touch_r_new = SensorTouch_released;
+    sensor_touch_clicked_t touch_l_old, touch_l_new = SensorTouch_released;
 
     while(1) {
-        Touch_Clicked(Port_3, &touch_l_new);
-        if(touch_l_new == SensorTouch_clicked && touch_l_old == SensorTouch_released)
-            setEvent(EV_FREQ_UP);
-        else
-            clearEvent(EV_FREQ_UP);
+        Touch_Clicked(Port_2, &touch_l_new);
+        if(touch_l_new == SensorTouch_clicked && touch_l_old == SensorTouch_released) {
+            setEvent(EV_FREQ_DOWN);
+        }
         touch_l_old = touch_l_new;
 
         Delay(N);
     }
 }
 void task3() {
-    setTimer(&timer, n, EV_LED_AN);
+	while(1) {
+		if(eventIsSet(EV_FREQ_UP)) {
+			led_time -= 100;
+			//setTimer(&timer, led_time, EV_LED_AN);
+			//startTimer(&timer);
+			clearEvent(EV_FREQ_UP);
+		}
+		if(eventIsSet(EV_FREQ_DOWN)) {
+			led_time += 100;
+			//setTimer(&timer, led_time, EV_LED_AN);
+			//startTimer(&timer);
+			clearEvent(EV_FREQ_DOWN);
+		}
+		if(eventIsSet(EV_LED_AN)) {
+			DeletePort(Port_1, 0);  //LED anschalten
+			setTimer(&timer, led_time, EV_LED_AUS);
+			startTimer(&timer);
+			clearEvent(EV_LED_AN);
+		}
+		if(eventIsSet(EV_LED_AUS)) {
+			WritePort(Port_1, 0);  //LED ausschalten
+			setTimer(&timer, led_time, EV_LED_AN);
+			startTimer(&timer);
+			clearEvent(EV_LED_AUS);
+		}
+		sprintf(msg, "%d", led_time);
+		NNXT_LCD_DisplayStringAtLine(0, msg);
+		Delay(N);
+	}
 }
-
+void task4() {
+	while(1) {
+        if( timer.active == true ) {
+            if((GetSysTime() - timer.startTime) > timer.time) {
+                timer.active = false;
+                setEvent(timer.event);
+            }
+        }
+        Delay(N);
+	}
+}
 int main(){
-    SensorPortInit(Port_1);
+    //SensorPortInit(Port_1);
+    SensorConfig(Port_0, SensorTouch);
+    SensorConfig(Port_2, SensorTouch);
+    setEvent(EV_LED_AN);
 
-    while(1) {
-        DeletePort(Port_1, 0);
-        Delay(n);
-        WritePort(Port_1, 0);
-        Delay(n);
-    }
+    CreateTask(task1);
+    CreateTask(task2);
+    CreateTask(task3);
+    CreateTask(task4);
+    StartTask(task1);
+    StartTask(task2);
+    StartTask(task3);
+    StartTask(task4);
+    StartScheduler();
+
    	return 0;
 }
 
