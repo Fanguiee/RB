@@ -3,18 +3,12 @@
 #include "events.h"
 #define N 200
 #define EV_LED_AN 0
+#define EV_LED_AUS 1
+#define EV_FREQ_UP 3
+#define EV_FREQ_DOWN 4
 
-typedef struct {
-    uint32_t startTime;
-    uint32_t time;
-    EventType event;
-    bool active;
-} TimerType;
 volatile TimerType timer;
 volatile uint8_t n = 1000;
-volatile freqUP = 0;
-volatile freqDown = 0;
-
 
 void task1() {
     sensor_touch_clicked_t touch_r_old, touch_r_new = SensorTouch_released;
@@ -22,7 +16,7 @@ void task1() {
     while(1) {
         Touch_Clicked(Port_0, &touch_r_new);
         if(touch_r_new == SensorTouch_clicked && touch_r_old == SensorTouch_released)
-            freqUP = 1;
+            setEvent(EV_FREQ_DOWN);
         touch_r_old = touch_r_new;
 
         Delay(N);
@@ -34,7 +28,7 @@ void task2() {
     while(1) {
         Touch_Clicked(Port_3, &touch_l_new);
         if(touch_l_new == SensorTouch_clicked && touch_l_old == SensorTouch_released)
-            freqUP = 1;
+            setEvent(EV_FREQ_UP);
         touch_l_old = touch_l_new;
 
         Delay(N);
@@ -42,20 +36,28 @@ void task2() {
 }
 void task3() {
 	while(1) {
-		if(freqUP)
+		if(eventIsSet(EV_FREQ_UP)) {
 			n /= 2;
-		if(freqDown)
+			setTimer(&timer, n, EV_LED_AN);
+			startTimer(&timer);
+		}
+		if(eventIsSet(EV_FREQ_DOWN)) {
 			n *= 2;
-		setTimer(&timer, n, EV_LED_AN);
-		startTimer(&timer);
+			setTimer(&timer, n, EV_LED_AN);
+			startTimer(&timer);
+		}
 	}
 }
 void task4() {
 	while(1) {
-		if(eventIsSet(EV_LED_AN))
+		if(eventIsSet(EV_LED_AN)) {
 			DeletePort(Port_1, 0);
-		else
+			clearEvent(EV_LED_AN);
+		}
+		else {
 			WritePort(Port_1, 0);
+			clearEvent(EV_LED_AN);
+		}
 	}
 }
 int main(){
